@@ -36,90 +36,62 @@ class UnexpectedSpaceError(Exception):
     def __init__(self, message):
         super(UnexpectedSpaceError, self).__init__(message)
 
-
-class RPN:
-    """
-    Reverse Polish notation converter and handler class
-    """
-
+class MathModuleData:
     def __init__(self):
-        self.stack, self.output, self.expression, self.tokens = [], [], '', []
-        self.postfix_ops = {'!': self.factorial}
-        self.prefix_ops = {a: getattr(math, a) for a in dir(math) if callable(getattr(math, a))}
-        other_prefix_op = {
+        self.postfix_operations = {'!': self.factorial}
+        self.prefix_operations = {a: getattr(math, a) for a in dir(math) if callable(getattr(math, a))}
+        custom_prefix_operations = {
             'log': self.logarithm,
-            'log2': self.logarithm_two,
-            'log10': self.logarithm_ten,
+            'log2': self.logarithm_by_two,
+            'log10': self.logarithm_by_ten,
             'pow': self.power,
             'sqrt': self.square_root,
-            'ln': self.logarithm_e,
+            'ln': self.logarithm_by_e,
             'abs': abs,
             'round': round,
-            'minus': self.unary_minus,
-            'plus': self.unary_plus,
+            'minus': self.add_unary_minus,
+            'plus': self.add_unary_plus,
         }
-        self.prefix_ops.update(other_prefix_op)
-        sign = namedtuple('sign', 'priority action')
+        self.prefix_operations.update(custom_prefix_operations)
+        operation_piority = namedtuple('operation_piority', 'priority action')
         self.signs = {
-            '^': sign(4, self.power),
-            '**': sign(4, self.power),
-            '/': sign(3, self.divide),
-            '//': sign(3, self.int_divide),
-            '%': sign(3, self.division_rest),
-            '*': sign(3, lambda digit1, digit2: digit1 * digit2),
-            '+': sign(2, lambda digit1, digit2: digit1 + digit2),
-            '-': sign(2, lambda digit1, digit2: digit1 - digit2),
-            '(': sign(1, None),
-            ')': sign(1, None),
-            '<': sign(0, lambda digit1, digit2: digit1 < digit2),
-            '<=': sign(0, lambda digit1, digit2: digit1 <= digit2),
-            '=': sign(0, lambda digit1, digit2: digit1 == digit2),
-            '==': sign(0, lambda digit1, digit2: digit1 == digit2),
-            '!=': sign(0, lambda digit1, digit2: digit1 != digit2),
-            '>=': sign(0, lambda digit1, digit2: digit1 >= digit2),
-            '>': sign(0, lambda digit1, digit2: digit1 > digit2)
+            '^': operation_piority(4, self.power),
+            '**': operation_piority(4, self.power),
+            '/': operation_piority(3, self.divide),
+            '//': operation_piority(3, self.int_divide),
+            '%': operation_piority(3, self.get_rest_of_division),
+            '*': operation_piority(3, lambda digit, base: digit * base),
+            '+': operation_piority(2, lambda digit, base: digit + base),
+            '-': operation_piority(2, lambda digit, base: digit - base),
+            '(': operation_piority(1, None),
+            ')': operation_piority(1, None),
+            '<': operation_piority(0, lambda digit, base: digit < base),
+            '<=': operation_piority(0, lambda digit, base: digit <= base),
+            '=': operation_piority(0, lambda digit, base: digit == base),
+            '==': operation_piority(0, lambda digit, base: digit == base),
+            '!=': operation_piority(0, lambda digit, base: digit != base),
+            '>=': operation_piority(0, lambda digit, base: digit >= base),
+            '>': operation_piority(0, lambda digit, base: digit > base)
         }
-        values = {attr: getattr(math, attr) for attr in dir(math) if isinstance(getattr(math, attr), Number)}
-        self.const_values = values
-        self.all_ops = {**self.postfix_ops, **self.prefix_ops, **self.signs}
+        self.CONSTANTS = {attr: getattr(math, attr) for attr in dir(math) 
+                                if isinstance(getattr(math, attr), Number)}
+        self.all_operations = {**self.postfix_operations, **self.prefix_operations, **self.signs}
 
-    def clear_stack(self):
-        """
-        Clears class attribute 'stack'
-        """
-        self.stack = []
 
+class CustomMathOperations:
+    """
+    Customized operations from math module with error handling
+    """
     @staticmethod
-    def is_num(item):
-        """
-        Checks whether this token is number
-        """
-        try:
-            float(item)
-            return True
-        except (ValueError, TypeError):
-            pass
-        return False
-
-    @staticmethod
-    def unary_minus(digit):
-        """
-        Changes 'digit' to '-digit'
-        """
+    def add_unary_minus(digit):
         return (-1) * digit
 
     @staticmethod
-    def unary_plus(digit):
-        """
-        Changes 'digit' to '+digit'
-        """
+    def add_unary_plus(digit):
         return digit
 
     @staticmethod
     def factorial(digit):
-        """
-        Calculates factorial on a digit
-        """
         if digit < 0:
             raise ValueError('can\'t count factorial of negative number')
         elif not str(digit).isdigit():
@@ -128,153 +100,130 @@ class RPN:
             return math.factorial(digit)
 
     @staticmethod
-    def logarithm(digit1, digit2):
-        """
-        Calculates logarithm of digit1 by base digit2
-        """
-        if digit2 == 1:
+    def logarithm(digit, base):
+        if base == 1:
             raise ZeroDivisionError('cant\'t count logarithm by base 1')
-        elif digit1 <= 0:
-            raise ValueError('can\'t count non-positive logarithm')
+        elif digit <= 0:
+            raise ValueError('can\'t count logarithm of non-positive digit')
         else:
-            return math.log(digit1, digit2)
+            return math.log(digit, base)
 
     @staticmethod
-    def logarithm_e(digit):
-        """
-        Calculates natural logarithm of digit by base e
-        """
+    def logarithm_by_e(digit):
         if digit > 0:
             return math.log(digit)
         else:
             raise ValueError('can\'t count non-positive logarithm')
 
-    def resolve_log(self):
-        """
-        If log() takes two parameter leaves it the same
-        If log() takes one parameter changes log() to ln() in place
-        """
-        open_parentheses_count = 0
-        close_parentheses_count = 0
-        for index, token in enumerate(self.tokens):
-            if token == 'log':
-                n_args = 1
-                for new_token in self.tokens[index + 1:]:
-                    if new_token == '(':
-                        open_parentheses_count += 1
-                    if new_token == ',':
-                        n_args = 2
-                    if new_token == ')':
-                        close_parentheses_count += 1
-                    if open_parentheses_count == close_parentheses_count:
-                        break
-                if n_args == 1:
-                    self.tokens[index] = 'ln'
-
     @staticmethod
-    def logarithm_two(digit):
-        """
-        Calculates logarithm of digit by base two
-        """
+    def logarithm_by_two(digit):
         if digit > 0:
             return math.log2(digit)
         else:
-            raise ValueError('can\'t count non-positive logarithm by base 2')
+            raise ValueError('can\'t count logarithm of non-positive digit by base 2')
 
     @staticmethod
-    def logarithm_ten(digit):
-        """
-        Calculates logarithm of digit by base ten
-        """
+    def logarithm_by_ten(digit):
         if digit > 0:
             return math.log10(digit)
         else:
-            raise ValueError('can\'t count non-positive logarithm by base 10')
+            raise ValueError('can\'t count logarithm of non-positive number by base 10')
 
     @staticmethod
-    def power(digit1, digit2):
-        """
-        Calculates digit2-power of digit1
-        """
-        if digit1 < 0 and not digit2.is_integer():
+    def power(digit, base):
+        if digit < 0 and not base.is_integer():
             raise ValueError('can\'t raise negative number to fractional power')
         else:
-            return pow(digit1, digit2)
+            return pow(digit, base)
 
     @staticmethod
     def square_root(digit):
-        """
-        Calculates square root of digit
-        """
         if digit >= 0:
             return math.sqrt(digit)
         else:
             raise ValueError('can\'t count square root of negative number')
 
     @staticmethod
-    def divide(digit1, digit2):
-        """
-        Calculates digit1 divided by digit2
-        """
-        if digit2 == 0:
+    def divide(digit, base):
+        if base == 0:
             raise ZeroDivisionError('can\'t divide by zero')
         else:
-            return digit1 / digit2
+            return digit / base
 
     @staticmethod
-    def int_divide(digit1, digit2):
-        """
-        Performes integer division of digit1 by digit2
-        """
-        if digit2 == 0:
+    def int_divide(digit, base):
+        if base == 0:
             raise ZeroDivisionError('can\'t divide by zero')
         else:
-            return digit1 // digit2
+            return digit // base
 
     @staticmethod
-    def division_rest(digit1, digit2):
-        """
-        Calculates the rest of division of ditit1 by digit2
-        """
-        if digit2 == 0:
+    def get_rest_of_division(digit, base):
+        if base == 0:
             raise ZeroDivisionError('can\'t divide by zero')
         else:
-            return digit1 % digit2
+            return digit % base
 
-    def add_implicit_multiply(self, tokens_list):
+
+class ExpressionResolver(MathModuleData):
+    """
+    Resolves implicit multiplication, unary signs and double constants standing together
+    """
+    def __init__(self):
+        return super().__init__()
+
+    def resolve_implicit_multiplication(self, tokens_list):
         """
-        Adds implicit multiplication to the new tokens list
+        Resolves implicit multiplication to the new tokens list
         Returns resolved list
         """
+        
+        # maybe it is better to use regular expression for this case
+
         resolved_list = []
 
-        def add_mult_sign():
+        def add_multiplication_sign():
             resolved_list.append('*')
             resolved_list.append(token)
 
         for index, token in enumerate(tokens_list):
-            prev = tokens_list[index - 1]
+            previous = tokens_list[index - 1]
             if index == 0:
                 resolved_list.append(token)
-            elif token in self.prefix_ops and self.is_num(prev):
-                add_mult_sign()
-            elif token in self.const_values and self.is_num(prev):
-                add_mult_sign()
-            elif token in self.prefix_ops and self.is_num(prev):
-                add_mult_sign()
-            elif token in self.const_values and prev in self.const_values:
-                add_mult_sign()
-            elif token in self.prefix_ops and prev == ')':
-                add_mult_sign()
-            elif self.is_num(token) and prev == ')':
-                add_mult_sign()
-            elif token == '(' and prev == ')':
-                add_mult_sign()
-            elif token == '(' and self.is_num(prev):
-                add_mult_sign()
+            elif (token in self.prefix_operations and self.is_number(previous)
+                or token in self.CONSTANTS and self.is_number(previous)
+                or token in self.CONSTANTS and previous in self.CONSTANTS
+                or token in self.prefix_operations and previous == ')'
+                or self.is_number(token) and previous == ')'
+                or token == '(' and self.is_number(previous)
+            ):
+                add_multiplication_sign()
             else:
                 resolved_list.append(token)
         return resolved_list
+
+    def resolve_log(self, tokens):
+        """
+        If log() takes two parameter leaves it the same
+        If log() takes one parameter changes log() to ln() in place
+        """
+        open_parentheses_count = 0
+        close_parentheses_count = 0
+        for index, token in enumerate(tokens):
+            if token == 'log':
+                number_of_arguments = 1
+                for character in tokens[index + 1:]:
+                    if character == '(':
+                        open_parentheses_count += 1
+                    elif character == ',':
+                        number_of_arguments = 2
+                    elif character == ')':
+                        close_parentheses_count += 1
+                    if open_parentheses_count == close_parentheses_count:
+                        break
+                if number_of_arguments == 1:
+                    tokens[index] = 'ln'
+        return tokens
 
     def resolve_unary(self, tokens_list):
         """
@@ -283,11 +232,11 @@ class RPN:
         """
         resolved_list = []
         for index, token in enumerate(tokens_list):
-            prev = tokens_list[index - 1]
+            previous = tokens_list[index - 1]
             if token == '-' or token == '+':
                 if index == 0:
                     resolved_list.append('minus') if token == '-' else resolved_list.append('plus')
-                elif prev == ')' or prev in self.const_values or self.is_num(prev):
+                elif previous == ')' or previous in self.CONSTANTS or self.is_number(previous):
                     resolved_list.append(token)
                 else:
                     resolved_list.append('minus') if token == '-' else resolved_list.append('plus')
@@ -295,39 +244,62 @@ class RPN:
                 resolved_list.append(token)
         return resolved_list
 
-    def resolve_double_const(self, some_sting):
+    def resolve_double_const(self, expression):
         """
         Resolves constant values standing together
         """
-        for const1 in list(self.const_values.keys()):
-            a = const1
-            for const2 in list(self.const_values.keys()):
-                b = const2
-                some_sting = some_sting.replace(f'{a}{b}', f'{a} {b}')
-        return some_sting
+        for first_const in list(self.CONSTANTS.keys()):
+            for second_const in list(self.CONSTANTS.keys()):
+                expression = expression.replace(f'{first_const}{second_const}', f'{first_const} {second_const}')
+        return expression
 
-    def create_tokens_list(self, some_string):
+
+class ReversePolishNotationConverter:
+    """
+    Converter of math expression to ReversePolishNotation (RPN) expression
+    """
+    def __init__(self):
+        self.stack, self.output, self.tokens = [], [], []
+        self.math_data = MathModuleData()
+        self.resolver = ExpressionResolver()
+
+    def clear_stack(self):
+        self.stack = []
+
+    @staticmethod
+    def is_number(item):
+        try:
+            float(item)
+            return True
+        except (ValueError, TypeError):
+            pass
+        return False
+
+    def create_tokens_list(self, expression):
         """
         Creates tokens list from math expressions string
         """
-        some_string = self.resolve_double_const(some_string)
-        line = generate_tokens(StringIO(some_string).readline)
+        line = generate_tokens(StringIO(expression).readline)
         return [token[1] for token in line if token[1]]
 
-    def convert_to_rpn(self, text):
+    def resolve_math_expression(self, expression):
+        expression = resolver.resolve_double_const(expression)
+        tokens = create_tokens_list(expression)
+        tokens = resolver.resolve_log(tokens)
+        tokens = resolver.resolve_unary(tokens)
+        self.tokens = resolver.resolve_implicit_multiplication(tokens) 
+        
+    def convert_to_rpn(self, expression):
         """
-        Converts initial math expression to Reverse Polish Notation while solving log(), unary operation
-        and adds implicit multiplication
-        Return tokens list in Reverse Polish Notation
+        Converts initial math expression to Reverse Polish Notation
+        Returns tokens list in Reverse Polish Notation
         """
-        self.tokens = self.create_tokens_list(text)
-        self.resolve_log()
-        self.tokens = self.resolve_unary(self.tokens)
-        self.tokens = self.add_implicit_multiply(self.tokens)
+        resolve_math_expression(expression)
         for item in self.tokens:
-            if self.is_num(item) or item in self.postfix_ops or item in self.const_values:
+            if is_number(item) or item in math_data.postfix_ops \
+                                or item in math_data.const_values:
                 self.output.append(item)
-            elif item == '(' or item in self.prefix_ops:
+            elif item == '(' or item in math_data.prefix_ops:
                 self.stack.append(item)
             elif item == ')':
                 for element in reversed(self.stack):
@@ -336,11 +308,11 @@ class RPN:
                     else:
                         self.stack.pop()
                         break
-            elif item in self.signs:
+            elif item in math_data.signs:
                 for element in reversed(self.stack):
-                    if self.stack[-1] in self.prefix_ops \
-                            or self.signs[self.stack[-1]].priority > self.signs[item].priority \
-                            or self.signs[self.stack[-1]].priority == self.signs[item].priority and item != '^':
+                    if self.stack[-1] in math_data.prefix_ops \
+                            or math_data.signs[self.stack[-1]].priority > self.signs[item].priority \
+                            or math_data.signs[self.stack[-1]].priority == self.signs[item].priority and item != '^':
                         self.output.append(self.stack.pop())
                 self.stack.append(item)
             elif item == ',':
@@ -356,129 +328,121 @@ class RPN:
         self.clear_stack()
         return list(self.output)
 
+
+class ReversePolishNotationHandler:
+    """
+    Handles PRN expression
+    """
+    def __init__(self):
+        self.math_data = MathModuleData()
+        self.stack = []
+
     def pop_one(self):
-        """
-        Pops one item from stack
-        """
         return float(self.stack.pop())
 
     def pop_two(self):
-        """
-        Pops two items from stack
-        """
         y = float(self.stack.pop())
         x = float(self.stack.pop())
         return x, y
 
-    def handle_operations(self, rpn_expression):
+    def handle_operations(self, rpn_tokens):
         """
-        Handles all operations in RPN tokens list
+        Handles all operations in Reverse Polish Notation tokens list
         Return result of calculation
         """
-        for op in rpn_expression:
-            # print('Stack: ', self.stack)
-            if op in self.const_values:
-                self.stack.append(self.const_values[op])
-            elif op not in self.all_ops:
-                self.stack.append(op)
-            elif op in self.signs:
+        for token in rpn_tokens:
+            if token in math_data.CONSTANTS:
+                self.stack.append(math_data.CONSTANTS[token])
+            elif token not in math_data.all_operations:
+                self.stack.append(token)
+            elif token in math_data.signs:
                 try:
-                    function = self.signs[op].action
+                    function = math_data.signs[token].action
                     x, y = self.pop_two()
                     self.stack.append(function(x, y))
                 except IndexError:
-                    raise MissingParameterError(f'not enough operands for "{op}" operation')
-            elif op in self.prefix_ops or self.postfix_ops:
+                    raise MissingParameterError(f'not enough operands for "{token}" operation')
+            elif token in math_data.prefix_operations or math_data.postfix_operations:
                 try:
-                    if op in ('fmod', 'gcd', 'isclose', 'ldexp', 'remainder', 'log', 'pow', 'atan2'):
-                        function = self.all_ops[op]
+                    if token in ('fmod', 'gcd', 'isclose', 'ldexp', 'remainder', 'log', 'pow', 'atan2'):
+                        function = math_data.all_operations[token]
                         x, y = self.pop_two()
                         self.stack.append(function(x, y))
                     else:
-                        function = self.all_ops[op]
+                        function = math.all_operations[token]
                         self.stack.append(function(self.pop_one()))
                 except IndexError:
-                    raise MissingParameterError(f'not enough operands for "{op}" operation')
+                    raise MissingParameterError(f'not enough operands for "{token}" operation')
         if len(self.stack) > 1:
             raise RedundantParameterError('function takes more parameters that it should')
         return self.stack[0]
 
-    @staticmethod
-    def parse_expression():
-        """
-        Creates command-line arguments parser
-        Returns parsed argument
-        """
-        parser = ArgumentParser(description='Pure Python command-line calculator')
-        parser.add_argument('EXPRESSION', help='expression string to evaluate', action='store_true')
-        parsed, args = parser.parse_known_args()
-        return args[0]
-
-
-class Check(RPN):
+    
+class ErroChecker:
     def __init__(self):
-        super(Check, self).__init__()
+        self.math_data = MathModuleData()
+        self.rpn_converter = ReversePolishNotationConverter()
 
-    def check_for_numbers(self, text):
+    def check_for_numbers(self, expression):
         """
         Checks whether expression has no operands
-        :param text: initial math expression
+        :param expression: initial math expression
         """
-        tokens = self.create_tokens_list(text)
+        tokens = rpn_converter.resolve_math_expression(expression)
         numbers_count = 0
         for token in tokens:
-            if self.is_num(token) or token in self.const_values:
+            if rpn_converter.is_number(token) or token in math_data.CONSTANTS:
                 numbers_count += 1
         if numbers_count == 0:
             raise MissingParameterError('no numbers or constants in expression')
 
     @staticmethod
-    def check_parentheses(text):
+    def check_parentheses(expression):
         """
         Checks whether parentheses are balanced
         """
-        n = abs(text.count('(') - text.count(')'))
-        if text.count('(') > text.count(')'):
+        n = abs(expression.count('(') - expression.count(')'))
+        if expression.count('(') > expression.count(')'):
             raise UnbalancedParenthesesError(f'expression has {n} unclosed parentheses')
-        elif text.count('(') < text.count(')'):
+        elif expression.count('(') < expression.count(')'):
             raise UnbalancedParenthesesError(f'expression has {n} redundant closing parentheses')
         if n == 0:
             pass
 
     @staticmethod
-    def check_for_symbols(some_string):
+    def check_for_symbols(expression):
         """
         Checks whether unsupported symbols are in the string
         """
         regex = compile('[;@_#$&?|}{~":]')
-        if regex.search(some_string):
-            raise UnknownSymbolError(f'unknown symbols "{regex.search(some_string).group()}"')
+        if regex.search(expression):
+            raise UnknownSymbolError(f'unknown symbols "{regex.search(expression).group()}"')
         else:
             pass
 
     @staticmethod
-    def check_spaces(some_string):
+    def check_spaces(expression):
         """
         Checks whether unexpected spaces are in the string
         """
-        for index, char in enumerate(some_string):
+        for index, character in enumerate(expression):
             try:
-                nxt = some_string[index + 1]
-                prev = some_string[index - 1]
-                if char == ' ':
-                    if nxt.isdigit() and prev.isdigit():
+                nxt = expression[index + 1]
+                previous = expression[index - 1]
+                if character == ' ':
+                    if nxt.isdigit() and previous.isdigit():
                         raise UnexpectedSpaceError('unexpected space between numbers')
-                    elif nxt == ' ' or prev == ' ':
+                    elif nxt == ' ' or previous == ' ':
                         raise UnexpectedSpaceError('unexpected double space')
-                    elif nxt == '.' and prev.isdigit() or nxt.isdigit() and prev == '.':
+                    elif nxt == '.' and previous.isdigit() or nxt.isdigit() and previous == '.':
                         raise UnexpectedSpaceError('unexpected space between/or in fractional numbers')
-                    elif nxt in '<>=!' and prev in '<>=!':
-                        raise UnexpectedSpaceError(f'unexpected space in comparison operation {prev + nxt}')
-                    elif nxt in '*/^' and prev in '*/^':
-                        raise UnexpectedSpaceError(f'unexpected space in operation {prev + nxt}')
-                    elif prev == '(' and nxt == ')':
+                    elif nxt in '<>=!' and previous in '<>=!':
+                        raise UnexpectedSpaceError(f'unexpected space in comparison operation {previous + nxt}')
+                    elif nxt in '*/^' and previous in '*/^':
+                        raise UnexpectedSpaceError(f'unexpected space in operation {previous + nxt}')
+                    elif previous == '(' and nxt == ')':
                         raise UnexpectedSpaceError('unexpected empty parentheses')
-                    elif prev == ')' and nxt == '.':
+                    elif previous == ')' and nxt == '.':
                         raise UnexpectedSpaceError('unexpected fractional number after ")"')
             except IndexError:
                 pass
@@ -493,14 +457,36 @@ class Check(RPN):
         self.check_spaces(expression)
 
 
+class Calculator:
+    """
+    Main calculator class
+    """
+    def __init__(self):
+        self.rpn_converter = ReversePolishNotationConverter()
+        self.rpn_handler = ReversePolishNotationHandler()
+        self.error_checker = ErroChecker()
+
+    @staticmethod
+    def parse_expression():
+        """
+        Creates command-line arguments parser
+        Returns parsed argument
+        """
+        parser = ArgumentParser(description='Pure Python command-line calculator')
+        parser.add_argument('EXPRESSION', help='expression string to evaluate', action='store_true')
+        parsed, args = parser.parse_known_args()
+        return args[0]
+    
+    def calculate(self):
+        math_expression = parse_expression()
+        ErroChecker.initial_check(math_expression)
+        return rpn_handler.handle_operations(rpn_converter.convert_to_rpn(math_expression))
+        
+
 def main():
     try:
-        rpn = RPN()
-        check = Check()
-        rpn.expression = rpn.parse_expression()
-        check.initial_check(rpn.expression)
-        rpn_expression = rpn.convert_to_rpn(rpn.expression)
-        print(rpn.handle_operations(rpn_expression))
+        calculator = Calculator()
+        print(calculator.calculate())
     except Exception as e:
         print(f'ERROR: {e}')
 
