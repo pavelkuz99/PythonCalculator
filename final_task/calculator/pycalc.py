@@ -36,52 +36,12 @@ class UnexpectedSpaceError(Exception):
     def __init__(self, message):
         super(UnexpectedSpaceError, self).__init__(message)
 
-class MathModuleData:
-    def __init__(self):
-        self.postfix_operations = {'!': self.factorial}
-        self.prefix_operations = {a: getattr(math, a) for a in dir(math) if callable(getattr(math, a))}
-        custom_prefix_operations = {
-            'log': self.logarithm,
-            'log2': self.logarithm_by_two,
-            'log10': self.logarithm_by_ten,
-            'pow': self.power,
-            'sqrt': self.square_root,
-            'ln': self.logarithm_by_e,
-            'abs': abs,
-            'round': round,
-            'minus': self.add_unary_minus,
-            'plus': self.add_unary_plus,
-        }
-        self.prefix_operations.update(custom_prefix_operations)
-        operation_piority = namedtuple('operation_piority', 'priority action')
-        self.signs = {
-            '^': operation_piority(4, self.power),
-            '**': operation_piority(4, self.power),
-            '/': operation_piority(3, self.divide),
-            '//': operation_piority(3, self.int_divide),
-            '%': operation_piority(3, self.get_rest_of_division),
-            '*': operation_piority(3, lambda digit, base: digit * base),
-            '+': operation_piority(2, lambda digit, base: digit + base),
-            '-': operation_piority(2, lambda digit, base: digit - base),
-            '(': operation_piority(1, None),
-            ')': operation_piority(1, None),
-            '<': operation_piority(0, lambda digit, base: digit < base),
-            '<=': operation_piority(0, lambda digit, base: digit <= base),
-            '=': operation_piority(0, lambda digit, base: digit == base),
-            '==': operation_piority(0, lambda digit, base: digit == base),
-            '!=': operation_piority(0, lambda digit, base: digit != base),
-            '>=': operation_piority(0, lambda digit, base: digit >= base),
-            '>': operation_piority(0, lambda digit, base: digit > base)
-        }
-        self.CONSTANTS = {attr: getattr(math, attr) for attr in dir(math) 
-                                if isinstance(getattr(math, attr), Number)}
-        self.all_operations = {**self.postfix_operations, **self.prefix_operations, **self.signs}
 
-
-class CustomMathOperations:
+class MathOperationsHandler:
     """
     Customized operations from math module with error handling
     """
+
     @staticmethod
     def add_unary_minus(digit):
         return (-1) * digit
@@ -164,108 +124,6 @@ class CustomMathOperations:
         else:
             return digit % base
 
-
-class ExpressionResolver(MathModuleData):
-    """
-    Resolves implicit multiplication, unary signs and double constants standing together
-    """
-    def __init__(self):
-        return super().__init__()
-
-    def resolve_implicit_multiplication(self, tokens_list):
-        """
-        Resolves implicit multiplication to the new tokens list
-        Returns resolved list
-        """
-        
-        # maybe it is better to use regular expression for this case
-
-        resolved_list = []
-
-        def add_multiplication_sign():
-            resolved_list.append('*')
-            resolved_list.append(token)
-
-        for index, token in enumerate(tokens_list):
-            previous = tokens_list[index - 1]
-            if index == 0:
-                resolved_list.append(token)
-            elif (token in self.prefix_operations and self.is_number(previous)
-                or token in self.CONSTANTS and self.is_number(previous)
-                or token in self.CONSTANTS and previous in self.CONSTANTS
-                or token in self.prefix_operations and previous == ')'
-                or self.is_number(token) and previous == ')'
-                or token == '(' and self.is_number(previous)
-            ):
-                add_multiplication_sign()
-            else:
-                resolved_list.append(token)
-        return resolved_list
-
-    def resolve_log(self, tokens):
-        """
-        If log() takes two parameter leaves it the same
-        If log() takes one parameter changes log() to ln() in place
-        """
-        open_parentheses_count = 0
-        close_parentheses_count = 0
-        for index, token in enumerate(tokens):
-            if token == 'log':
-                number_of_arguments = 1
-                for character in tokens[index + 1:]:
-                    if character == '(':
-                        open_parentheses_count += 1
-                    elif character == ',':
-                        number_of_arguments = 2
-                    elif character == ')':
-                        close_parentheses_count += 1
-                    if open_parentheses_count == close_parentheses_count:
-                        break
-                if number_of_arguments == 1:
-                    tokens[index] = 'ln'
-        return tokens
-
-    def resolve_unary(self, tokens_list):
-        """
-        Resolves all unary '-' and '+' operations changing them to 'minus' and 'plus' functions
-        Returns resolved list
-        """
-        resolved_list = []
-        for index, token in enumerate(tokens_list):
-            previous = tokens_list[index - 1]
-            if token == '-' or token == '+':
-                if index == 0:
-                    resolved_list.append('minus') if token == '-' else resolved_list.append('plus')
-                elif previous == ')' or previous in self.CONSTANTS or self.is_number(previous):
-                    resolved_list.append(token)
-                else:
-                    resolved_list.append('minus') if token == '-' else resolved_list.append('plus')
-            else:
-                resolved_list.append(token)
-        return resolved_list
-
-    def resolve_double_const(self, expression):
-        """
-        Resolves constant values standing together
-        """
-        for first_const in list(self.CONSTANTS.keys()):
-            for second_const in list(self.CONSTANTS.keys()):
-                expression = expression.replace(f'{first_const}{second_const}', f'{first_const} {second_const}')
-        return expression
-
-
-class ReversePolishNotationConverter:
-    """
-    Converter of math expression to ReversePolishNotation (RPN) expression
-    """
-    def __init__(self):
-        self.stack, self.output, self.tokens = [], [], []
-        self.math_data = MathModuleData()
-        self.resolver = ExpressionResolver()
-
-    def clear_stack(self):
-        self.stack = []
-
     @staticmethod
     def is_number(item):
         try:
@@ -275,7 +133,179 @@ class ReversePolishNotationConverter:
             pass
         return False
 
-    def create_tokens_list(self, expression):
+
+class MathModuleData(MathOperationsHandler):
+    def __init__(self):
+        self.__postfix_operations = {'!': super().factorial}
+        self.__prefix_operations = {a: getattr(math, a) for a in dir(math) if callable(getattr(math, a))}
+        custom_prefix_operations = {
+            'log': super().logarithm,
+            'log2': super().logarithm_by_two,
+            'log10': super().logarithm_by_ten,
+            'pow': super().power,
+            'sqrt': super().square_root,
+            'ln': super().logarithm_by_e,
+            'abs': abs,
+            'round': round,
+            'minus': super().add_unary_minus,
+            'plus': super().add_unary_plus,
+        }
+        self.__prefix_operations.update(custom_prefix_operations)
+        operation = namedtuple('operation', 'priority action')
+        self.__one_sign_operations = {
+            '^': operation(4, super().power),
+            '**': operation(4, super().power),
+            '/': operation(3, super().divide),
+            '//': operation(3, super().int_divide),
+            '%': operation(3, super().get_rest_of_division),
+            '*': operation(3, lambda digit, base: digit * base),
+            '+': operation(2, lambda digit, base: digit + base),
+            '-': operation(2, lambda digit, base: digit - base),
+            '(': operation(1, None),
+            ')': operation(1, None),
+            '<': operation(0, lambda digit, base: digit < base),
+            '<=': operation(0, lambda digit, base: digit <= base),
+            '=': operation(0, lambda digit, base: digit == base),
+            '==': operation(0, lambda digit, base: digit == base),
+            '!=': operation(0, lambda digit, base: digit != base),
+            '>=': operation(0, lambda digit, base: digit >= base),
+            '>': operation(0, lambda digit, base: digit > base)
+        }
+        self.__CONSTANTS = {attr: getattr(math, attr) for attr in dir(math)
+                            if isinstance(getattr(math, attr), Number)}
+        self.__all_operations = {**self.__postfix_operations, **self.__prefix_operations, **self.__one_sign_operations}
+
+    def get_postfix_operations(self):
+        return self.__postfix_operations
+
+    def get_prefix_operations(self):
+        return self.__prefix_operations
+
+    def get_one_sign_operations(self):
+        return self.__one_sign_operations
+
+    def get_constants(self):
+        return self.__CONSTANTS
+
+    def get_all_operations(self):
+        return self.__all_operations
+
+
+class ExpressionResolver(MathModuleData):
+    """
+    Resolves implicit multiplication, unary signs and double constants standing together
+    """
+
+    # maybe it is better to use regular expression for this case
+
+    def __init__(self):
+        super().__init__()
+
+    def resolve_implicit_multiplication(self, tokens_list):
+        """
+        Resolves implicit multiplication to the new tokens list
+        Returns resolved list
+        """
+
+        result = []
+
+        def add_multiplication_sign():
+            result.append('*')
+            result.append(token)
+
+        for index, token in enumerate(tokens_list):
+            previous = tokens_list[index - 1]
+            if index == 0:
+                result.append(token)
+            elif (token in super().get_prefix_operations() and super().is_number(previous)
+                  or token in super().get_constants() and super().is_number(previous)
+                  or token in super().get_constants() and previous in super().get_constants()
+                  or token in super().get_prefix_operations() and previous == ')'
+                  or super().is_number(token) and previous == ')'
+                  or token == '(' and super().is_number(previous)):
+                add_multiplication_sign()
+            else:
+                result.append(token)
+        return result
+
+    def resolve_log(self, tokens_list):
+        """
+        If log() takes two parameter leaves it the same
+        If log() takes one parameter changes log() to ln() in place
+        """
+        open_parentheses_count = 0
+        close_parentheses_count = 0
+        for index, token in enumerate(tokens_list):
+            if token == 'log':
+                number_of_arguments = 1
+                for character in tokens_list[index + 1:]:
+                    if character == '(':
+                        open_parentheses_count += 1
+                    elif character == ',':
+                        number_of_arguments = 2
+                    elif character == ')':
+                        close_parentheses_count += 1
+                    if open_parentheses_count == close_parentheses_count:
+                        break
+                if number_of_arguments == 1:
+                    tokens_list[index] = 'ln'
+        return tokens_list
+
+    def resolve_unary(self, tokens_list):
+        """
+        Resolves all unary '-' and '+' operations changing them to 'minus' and 'plus' functions
+        Returns resolved list
+        """
+        result = []
+        for index, token in enumerate(tokens_list):
+            previous = tokens_list[index - 1]
+            if token == '-' or token == '+':
+                if index == 0:
+                    result.append('minus') if token == '-' else result.append('plus')
+                elif previous == ')' or previous in super().get_constants() or super().is_number(previous):
+                    result.append(token)
+                else:
+                    result.append('minus') if token == '-' else result.append('plus')
+            else:
+                result.append(token)
+        return result
+
+    def resolve_double_const(self, expression):
+        """
+        Resolves constant values standing together
+        """
+        for first_const in list(super().get_constants().keys()):
+            for second_const in list(super().get_constants().keys()):
+                expression = expression.replace(f'{first_const}{second_const}', f'{first_const} {second_const}')
+        return expression
+
+
+class ReversePolishNotationConverter(MathModuleData):
+    """
+    Converter of math expression to ReversePolishNotation (RPN) expression
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.stack, self.output, self.tokens = [], [], []
+        self.resolver = ExpressionResolver()
+
+    def clear_stack(self):
+        self.stack = []
+
+    def check_for_numbers(self, list_of_tokens):
+        """
+        Checks whether expression has no operands
+        """
+        numbers_count = 0
+        for token in list_of_tokens:
+            if super().is_number(token) or token in super().get_constants():
+                numbers_count += 1
+        if numbers_count == 0:
+            raise MissingParameterError('no numbers or constants in expression')
+
+    @staticmethod
+    def create_tokens_list(expression):
         """
         Creates tokens list from math expressions string
         """
@@ -283,23 +313,26 @@ class ReversePolishNotationConverter:
         return [token[1] for token in line if token[1]]
 
     def resolve_math_expression(self, expression):
-        expression = resolver.resolve_double_const(expression)
-        tokens = create_tokens_list(expression)
-        tokens = resolver.resolve_log(tokens)
-        tokens = resolver.resolve_unary(tokens)
-        self.tokens = resolver.resolve_implicit_multiplication(tokens) 
-        
+        expression = self.resolver.resolve_double_const(expression)
+        tokens = self.create_tokens_list(expression)
+        tokens = self.resolver.resolve_log(tokens)
+        tokens = self.resolver.resolve_unary(tokens)
+        self.check_for_numbers(tokens)
+        self.tokens = self.resolver.resolve_implicit_multiplication(tokens)
+
     def convert_to_rpn(self, expression):
         """
         Converts initial math expression to Reverse Polish Notation
         Returns tokens list in Reverse Polish Notation
         """
-        resolve_math_expression(expression)
+
+        self.resolve_math_expression(expression)
+
         for item in self.tokens:
-            if is_number(item) or item in math_data.postfix_ops \
-                                or item in math_data.const_values:
+            if super().is_number(item) or item in super().get_postfix_operations() \
+                    or item in super().get_constants():
                 self.output.append(item)
-            elif item == '(' or item in math_data.prefix_ops:
+            elif item == '(' or item in super().get_prefix_operations():
                 self.stack.append(item)
             elif item == ')':
                 for element in reversed(self.stack):
@@ -308,11 +341,13 @@ class ReversePolishNotationConverter:
                     else:
                         self.stack.pop()
                         break
-            elif item in math_data.signs:
+            elif item in super().get_one_sign_operations():
                 for element in reversed(self.stack):
-                    if self.stack[-1] in math_data.prefix_ops \
-                            or math_data.signs[self.stack[-1]].priority > self.signs[item].priority \
-                            or math_data.signs[self.stack[-1]].priority == self.signs[item].priority and item != '^':
+                    if self.stack[-1] in super().get_prefix_operations() \
+                            or super().get_one_sign_operations()[self.stack[-1]].priority \
+                            > self.get_one_sign_operations()[item].priority \
+                            or super().get_one_sign_operations()[self.stack[-1]].priority \
+                            == super().get_one_sign_operations()[item].priority and item != '^':
                         self.output.append(self.stack.pop())
                 self.stack.append(item)
             elif item == ',':
@@ -329,12 +364,13 @@ class ReversePolishNotationConverter:
         return list(self.output)
 
 
-class ReversePolishNotationHandler:
+class ReversePolishNotationHandler(MathModuleData):
     """
     Handles PRN expression
     """
+
     def __init__(self):
-        self.math_data = MathModuleData()
+        super().__init__()
         self.stack = []
 
     def pop_one(self):
@@ -351,25 +387,25 @@ class ReversePolishNotationHandler:
         Return result of calculation
         """
         for token in rpn_tokens:
-            if token in math_data.CONSTANTS:
-                self.stack.append(math_data.CONSTANTS[token])
-            elif token not in math_data.all_operations:
+            if token in super().get_constants():
+                self.stack.append(super().get_constants()[token])
+            elif token not in super().get_all_operations():
                 self.stack.append(token)
-            elif token in math_data.signs:
+            elif token in super().get_one_sign_operations():
                 try:
-                    function = math_data.signs[token].action
+                    function = super().get_one_sign_operations()[token].action
                     x, y = self.pop_two()
                     self.stack.append(function(x, y))
                 except IndexError:
                     raise MissingParameterError(f'not enough operands for "{token}" operation')
-            elif token in math_data.prefix_operations or math_data.postfix_operations:
+            elif token in super().get_prefix_operations() or super().get_postfix_operations():
                 try:
                     if token in ('fmod', 'gcd', 'isclose', 'ldexp', 'remainder', 'log', 'pow', 'atan2'):
-                        function = math_data.all_operations[token]
+                        function = super().get_all_operations()[token]
                         x, y = self.pop_two()
                         self.stack.append(function(x, y))
                     else:
-                        function = math.all_operations[token]
+                        function = super().get_all_operations()[token]
                         self.stack.append(function(self.pop_one()))
                 except IndexError:
                     raise MissingParameterError(f'not enough operands for "{token}" operation')
@@ -377,24 +413,11 @@ class ReversePolishNotationHandler:
             raise RedundantParameterError('function takes more parameters that it should')
         return self.stack[0]
 
-    
-class ErroChecker:
-    def __init__(self):
-        self.math_data = MathModuleData()
-        self.rpn_converter = ReversePolishNotationConverter()
 
-    def check_for_numbers(self, expression):
-        """
-        Checks whether expression has no operands
-        :param expression: initial math expression
-        """
-        tokens = rpn_converter.resolve_math_expression(expression)
-        numbers_count = 0
-        for token in tokens:
-            if rpn_converter.is_number(token) or token in math_data.CONSTANTS:
-                numbers_count += 1
-        if numbers_count == 0:
-            raise MissingParameterError('no numbers or constants in expression')
+class ErrorChecker:
+    """
+    Class has methods for initial error check of math expression
+    """
 
     @staticmethod
     def check_parentheses(expression):
@@ -447,24 +470,13 @@ class ErroChecker:
             except IndexError:
                 pass
 
-    def initial_check(self, expression):
-        """
-        Performes initial checks of the expression for errors
-        """
-        self.check_parentheses(expression)
-        self.check_for_symbols(expression)
-        self.check_for_numbers(expression)
-        self.check_spaces(expression)
 
-
-class Calculator:
+class Calculator(ReversePolishNotationConverter, ReversePolishNotationHandler):
     """
     Main calculator class
     """
     def __init__(self):
-        self.rpn_converter = ReversePolishNotationConverter()
-        self.rpn_handler = ReversePolishNotationHandler()
-        self.error_checker = ErroChecker()
+        super().__init__()
 
     @staticmethod
     def parse_expression():
@@ -476,12 +488,15 @@ class Calculator:
         parser.add_argument('EXPRESSION', help='expression string to evaluate', action='store_true')
         parsed, args = parser.parse_known_args()
         return args[0]
-    
+
     def calculate(self):
-        math_expression = parse_expression()
-        ErroChecker.initial_check(math_expression)
-        return rpn_handler.handle_operations(rpn_converter.convert_to_rpn(math_expression))
-        
+        math_expression = self.parse_expression()
+        ErrorChecker.check_for_symbols(math_expression)
+        ErrorChecker.check_parentheses(math_expression)
+        ErrorChecker.check_spaces(math_expression)
+        rpn_expression = super().convert_to_rpn(math_expression)
+        return super().handle_operations(rpn_expression)
+
 
 def main():
     try:
