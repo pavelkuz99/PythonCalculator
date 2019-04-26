@@ -1,5 +1,5 @@
 import unittest
-# import parameterized
+from parameterized import parameterized, parameterized_class
 import sys
 from final_task.calculator import pycalc
 import math
@@ -79,86 +79,73 @@ class TestMathOperationsHandler(unittest.TestCase):
     @unittest.expectedFailure
     def test_fail_is_number(self):
         self.assertTrue(self.math_operations.is_number('hello'))
+
+    def test_is_number(self):
         self.assertEqual(self.math_operations.is_number('.3'), True)
         self.assertEqual(self.math_operations.is_number('11.8'), True)
         self.assertEqual(self.math_operations.is_number('a'), False)
         self.assertEqual(self.math_operations.is_number('sin'), False)
 
 
+class TestExpressionResolver(unittest.TestCase):
+    def setUp(self):
+        self.resolver = pycalc.ExpressionResolver()
+
+    # some issue with (3)(10+1) kind of expression
+    @parameterized.expand([
+        ('2 ( 10 + 1 )'.split(), '2 * ( 10 + 1 )'.split()),
+        ('8 sin ( 10 + 1 )'.split(), '8 * sin ( 10 + 1 )'.split()),
+        ('e pi'.split(), 'e * pi'.split()),
+        ('( 3 ) 10'.split(), '( 3 ) * 10'.split()),
+        ('6 pi'.split(), '6 * pi'.split()),
+    ])
+    def test_resolve_implicit_multiplication(self, expression, expected):
+        self.assertEqual(self.resolver.resolve_implicit_multiplication(expression), expected)
+
+    @parameterized.expand([
+        ('log ( 8 , 2 )'.split(), 'log ( 8 , 2 )'.split()),
+        ('log ( 8 )'.split(), 'ln ( 8 )'.split()),
+    ])
+    def test_resolve_log(self, expression, expected):
+        self.assertEqual(self.resolver.resolve_log(expression), expected)
+
+    @parameterized.expand([
+        ('+ 13'.split(), 'plus 13'.split()),
+        ('- sin ( pi )'.split(), 'minus sin ( pi )'.split()),
+    ])
+    def test_resolve_unary(self, expression, expected):
+        self.assertEqual(self.resolver.resolve_unary(expression), expected)
+
+    def test_resolve_double_const(self):
+        self.assertEqual(self.resolver.resolve_double_const('epi + pitau'), 'e pi + pi tau')
 
 
+class TestRPNConverter(unittest.TestCase):
+    def setUp(self):
+        self.converter = pycalc.ReversePolishNotationConverter()
 
+    @parameterized.expand([
+        ('3+2-log(8,2)', ['3', '+', '2', '-', 'log', '(', '8', ',', '2', ')']),
+        ('sin(pi/2)', ['sin', '(', 'pi', '/', '2', ')']),
+    ])
+    def test_create_tokens_list(self, expression, expected):
+        self.assertEqual(self.converter.create_tokens_list(expression), expected)
 
+    def test_convert_to_rpn(self):
+        self.assertEqual(self.converter.convert_to_rpn('-sin(pi/2)'), ['pi', '2', '/', 'sin', 'minus'])
+        with self.assertRaises(pycalc.UnknownFunctionError):
+            self.converter.convert_to_rpn('sen(pi/2)')
 
+    def test_clear_stack(self):
+        self.converter.stack = ['1', '3', '+']
+        self.converter.clear_stack()
+        self.assertEqual(self.converter.stack, [])
 
 
 # class TestRPN(TestCase):
-#     def setUp(self):
-#         self.rpn = pycalc.RPN()
-#
-#     def test_clear_stack(self):
-#         self.rpn.stack = ['3', '2', '*']
-#         self.rpn.stack.append('10')
-#         self.rpn.clear_stack()
-#         self.assertEqual(self.rpn.stack, [])
-#
-#     def test_is_num(self):
-#         self.assertEqual(self.rpn.is_num('5.0'), True)
 
 #
 #
-#
-#
-#
-#     def test_resolve_log(self):
-#         self.rpn.tokens = ['log', '(', '8', ',', '2', ')']
-#         self.rpn.resolve_log()
-#         self.assertEqual(self.rpn.tokens[0], 'log')
-#         self.rpn.tokens = ['log', '(', '8', ')']
-#         self.rpn.resolve_log()
-#         self.assertEqual(self.rpn.tokens[0], 'ln')
-#
-
-#
-
-#
-#     def test_add_implicit_multiply(self):
-#         token_list1 = ['2', '(', '10', '+', '1'')']
-#         token_list2 = ['8', 'sin', '(', '10', '+', '1'')']
-#         token_list3 = ['(', '3', ')', '(', '10', '+', '1', ')']
-#         token_list4 = ['e', 'pi']
-#         token_list5 = ['(', '3', ')', '10']
-#         token_list6 = ['(', '3', ')', 'sin', '(', '1', ')']
-#         token_list7 = ['6', 'pi']
-#         self.assertEqual(self.rpn.add_implicit_multiply(token_list1), ['2', '*', '(', '10', '+', '1'')'])
-#         self.assertEqual(self.rpn.add_implicit_multiply(token_list2), ['8', '*', 'sin', '(', '10', '+', '1'')'])
-#         self.assertEqual(self.rpn.add_implicit_multiply(token_list3), ['(', '3', ')', '*', '(', '10', '+', '1', ')'])
-#         self.assertEqual(self.rpn.add_implicit_multiply(token_list4), ['e', '*', 'pi'])
-#         self.assertEqual(self.rpn.add_implicit_multiply(token_list5), ['(', '3', ')', '*', '10'])
-#         self.assertEqual(self.rpn.add_implicit_multiply(token_list6), ['(', '3', ')', '*', 'sin', '(', '1', ')'])
-#         self.assertEqual(self.rpn.add_implicit_multiply(token_list7), ['6', '*', 'pi'])
-#
-#     def test_resolve_unary(self):
-#         token_list1 = ['+', '13']
-#         token_list2 = ['-', 'sin', '(', 'pi', ')']
-#         self.assertEqual(self.rpn.resolve_unary(token_list1), ['plus', '13'])
-#         self.assertEqual(self.rpn.resolve_unary(token_list2), ['minus', 'sin', '(', 'pi', ')'])
-#
-#     def test_resolve_double_const(self):
-#         self.assertEqual(self.rpn.resolve_double_const('epi + pitau'), 'e pi + pi tau')
-#
-#     def test_create_tokens_list(self):
-#         result1 = ['3', '+', '2', '-', 'log', '(', '8', ',', '2', ')']
-#         self.assertEqual(self.rpn.create_tokens_list('3+2-log(8,2)'), result1)
-#         result2 = ['sin', '(', 'pi', '/', '2', ')']
-#         self.assertEqual(self.rpn.create_tokens_list('sin(pi/2)'), result2)
-#
-#     def test_convert_to_rpn(self):
-#         expression = '-sin(pi/2)'
-#         self.assertEqual(self.rpn.convert_to_rpn(expression), ['pi', '2', '/', 'sin', 'minus'])
-#         expression = 'sen(pi/2)'
-#         with self.assertRaises(pycalc.UnknownFunctionError):
-#             self.rpn.convert_to_rpn(expression)
 #
 #     def test_pop_one(self):
 #         self.rpn.stack = [1, 2, 3, 4]
@@ -222,6 +209,7 @@ class TestMathOperationsHandler(unittest.TestCase):
 #             self.check.check_spaces(expression4)
 #         with self.assertRaises(pycalc.UnexpectedSpaceError):
 #             self.check.check_spaces(expression5)
+
 
 if __name__ == '__main__':
     unittest.main()
