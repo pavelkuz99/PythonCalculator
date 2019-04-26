@@ -91,7 +91,7 @@ class MathOperationsHandler:
 
     @staticmethod
     def power(digit, base):
-        if digit < 0 and not base.is_integer():
+        if digit < 0 and not float(base).is_integer():
             raise ValueError('can\'t raise negative number to fractional power')
         else:
             return pow(digit, base)

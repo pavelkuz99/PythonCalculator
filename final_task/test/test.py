@@ -1,5 +1,6 @@
 import unittest
 # import parameterized
+import sys
 from final_task.calculator import pycalc
 import math
 
@@ -20,8 +21,75 @@ class TestMathOperationsHandler(unittest.TestCase):
     def test_factorial(self):
         with self.assertRaises(ValueError):
             self.math_operations.factorial(6.66)
+        with self.assertRaises(ValueError):
+            self.math_operations.factorial(-13)
         self.assertEqual(self.math_operations.factorial(5), 120)
         self.assertEqual(self.math_operations.factorial(0), 1)
+
+    def test_logarithm(self):
+        self.assertEqual(self.math_operations.logarithm(8, 2), math.log(8, 2))
+        with self.assertRaises(ZeroDivisionError):
+            self.math_operations.logarithm(8, 1)
+        with self.assertRaises(ValueError):
+            self.math_operations.logarithm(-8, -2)
+
+    def test_logarithm_by_e(self):
+        self.assertEqual(self.math_operations.logarithm_by_e(13), math.log(13))
+        with self.assertRaises(ValueError):
+            self.math_operations.logarithm_by_e(-20)
+
+    def test_logarithm_by_two(self):
+        self.assertEqual(self.math_operations.logarithm_by_two(8), math.log2(8))
+        with self.assertRaises(ValueError):
+            self.math_operations.logarithm_by_two(-666)
+
+    def test_logarithm_by_ten(self):
+        self.assertEqual(self.math_operations.logarithm_by_ten(8), math.log10(8))
+        with self.assertRaises(ValueError):
+            self.math_operations.logarithm_by_ten(-666)
+
+    def test_power(self):
+        for i in range(-5, 5):
+            with self.subTest(i=i):
+                self.assertEqual(self.math_operations.power(i, 2), math.pow(i, 2))
+        with self.assertRaises(ValueError):
+            self.math_operations.power(-6.66, .28)
+
+    def test_square_root(self):
+        self.assertEqual(self.math_operations.square_root(16), math.sqrt(16))
+        self.assertEqual(self.math_operations.square_root(101.1), math.sqrt(101.1))
+        with self.assertRaises(ValueError):
+            self.math_operations.square_root(-2)
+
+    def test_divide(self):
+        self.assertEqual(self.math_operations.divide(18, -2.5), 18 / -2.5)
+        with self.assertRaises(ZeroDivisionError):
+            self.math_operations.divide(-2, 0)
+
+    def test_int_divide(self):
+        self.assertEqual(self.math_operations.int_divide(1813, 22), 1813 // 22)
+        with self.assertRaises(ZeroDivisionError):
+            self.math_operations.int_divide(-2, 0)
+
+    def test_division_rest(self):
+        self.assertEqual(self.math_operations.get_rest_of_division(131, 0.8), 131 % 0.8)
+        with self.assertRaises(ZeroDivisionError):
+            self.math_operations.get_rest_of_division(13, 0)
+
+    @unittest.expectedFailure
+    def test_fail_is_number(self):
+        self.assertTrue(self.math_operations.is_number('hello'))
+        self.assertEqual(self.math_operations.is_number('.3'), True)
+        self.assertEqual(self.math_operations.is_number('11.8'), True)
+        self.assertEqual(self.math_operations.is_number('a'), False)
+        self.assertEqual(self.math_operations.is_number('sin'), False)
+
+
+
+
+
+
+
 
 
 # class TestRPN(TestCase):
@@ -36,34 +104,11 @@ class TestMathOperationsHandler(unittest.TestCase):
 #
 #     def test_is_num(self):
 #         self.assertEqual(self.rpn.is_num('5.0'), True)
-#         self.assertEqual(self.rpn.is_num('.3'), True)
-#         self.assertEqual(self.rpn.is_num('11.8'), True)
-#         self.assertEqual(self.rpn.is_num('a'), False)
-#         self.assertEqual(self.rpn.is_num('sin'), False)
+
 #
-#     def test_unary_plus(self):
-#         self.assertEqual(self.rpn.unary_plus(6), 6)
-#         self.assertEqual(self.rpn.unary_plus(-88.6), -88.6)
-#         self.assertEqual(self.rpn.unary_plus(.1), 0.1)
 #
-#     def test_factorial(self):
-#         self.assertEqual(self.rpn.factorial(10), math.factorial(10))
-#         with self.assertRaises(ValueError):
-#             self.rpn.factorial(-13)
-#         with self.assertRaises(ValueError):
-#             self.rpn.factorial(666.6)
 #
-#     def test_logarithm(self):
-#         self.assertEqual(self.rpn.logarithm(8, 2), math.log(8, 2))
-#         with self.assertRaises(ZeroDivisionError):
-#             self.rpn.logarithm(8, 1)
-#         with self.assertRaises(ValueError):
-#             self.rpn.logarithm(-8, -2)
 #
-#     def test_logarithm_e(self):
-#         self.assertEqual(self.rpn.logarithm_e(13), math.log(13))
-#         with self.assertRaises(ValueError):
-#             self.rpn.logarithm_e(-20)
 #
 #     def test_resolve_log(self):
 #         self.rpn.tokens = ['log', '(', '8', ',', '2', ')']
@@ -73,43 +118,9 @@ class TestMathOperationsHandler(unittest.TestCase):
 #         self.rpn.resolve_log()
 #         self.assertEqual(self.rpn.tokens[0], 'ln')
 #
-#     def test_logarithm_two(self):
-#         self.assertEqual(self.rpn.logarithm_two(8), math.log2(8))
-#         with self.assertRaises(ValueError):
-#             self.rpn.logarithm_two(-666)
+
 #
-#     def test_logarithm_ten(self):
-#         self.assertEqual(self.rpn.logarithm_ten(8), math.log10(8))
-#         with self.assertRaises(ValueError):
-#             self.rpn.logarithm_ten(-666)
-#
-#     def test_power(self):
-#         self.assertEqual(self.rpn.power(2, 4), math.pow(2, 4))
-#         self.assertEqual(self.rpn.power(10, 2), math.pow(10, 2))
-#         self.assertEqual(self.rpn.power(3, -2), math.pow(3, -2))
-#         with self.assertRaises(ValueError):
-#             self.rpn.power(-2, 1.5)
-#
-#     def test_square_root(self):
-#         self.assertEqual(self.rpn.square_root(16), math.sqrt(16))
-#         self.assertEqual(self.rpn.square_root(101.1), math.sqrt(101.1))
-#         with self.assertRaises(ValueError):
-#             self.rpn.square_root(-2)
-#
-#     def test_divide(self):
-#         self.assertEqual(self.rpn.divide(18, -2.5), 18 / -2.5)
-#         with self.assertRaises(ZeroDivisionError):
-#             self.rpn.divide(-2, 0)
-#
-#     def test_int_divide(self):
-#         self.assertEqual(self.rpn.int_divide(1813, 22), 1813 // 22)
-#         with self.assertRaises(ZeroDivisionError):
-#             self.rpn.int_divide(-2, 0)
-#
-#     def test_division_rest(self):
-#         self.assertEqual(self.rpn.division_rest(131, 0.8), 131 % 0.8)
-#         with self.assertRaises(ZeroDivisionError):
-#             self.rpn.division_rest(13, 0)
+
 #
 #     def test_add_implicit_multiply(self):
 #         token_list1 = ['2', '(', '10', '+', '1'')']
