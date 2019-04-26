@@ -14,14 +14,14 @@ class TestMathOperationsHandler(unittest.TestCase):
         self.assertEqual(self.math_operations.add_unary_minus(-.8), 0.8)
 
     def test_add_unary_plus(self):
-        self.assertEqual(self.math_operations.add_unary_plus(5), 5)
-        self.assertEqual(self.math_operations.add_unary_plus(5.6), 5.6)
-        self.assertEqual(self.math_operations.add_unary_plus(.8), 0.8)
+        self.assertEqual(self.math_operations.add_unary_plus(6), 6)
+        self.assertEqual(self.math_operations.add_unary_plus(-5.5), -5.5)
 
     def test_factorial(self):
         with self.assertRaises(ValueError):
-            self.math_operations.factorial(-5)
-            self.math_operations.factorial(5.5)
+            self.math_operations.factorial(6.66)
+        self.assertEqual(self.math_operations.factorial(5), 120)
+        self.assertEqual(self.math_operations.factorial(0), 1)
 
 
 # class TestRPN(TestCase):
@@ -40,10 +40,6 @@ class TestMathOperationsHandler(unittest.TestCase):
 #         self.assertEqual(self.rpn.is_num('11.8'), True)
 #         self.assertEqual(self.rpn.is_num('a'), False)
 #         self.assertEqual(self.rpn.is_num('sin'), False)
-#
-#     def test_unary_minus(self):
-#         self.assertEqual(self.rpn.unary_minus(5), -5)
-#
 #
 #     def test_unary_plus(self):
 #         self.assertEqual(self.rpn.unary_plus(6), 6)
