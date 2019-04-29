@@ -142,73 +142,59 @@ class TestRPNConverter(unittest.TestCase):
         self.assertEqual(self.converter.stack, [])
 
 
-# class TestRPN(TestCase):
+class TestRPNHandler(unittest.TestCase):
+    def setUp(self):
+        self.handler = pycalc.ReversePolishNotationHandler()
 
-#
-#
-#
-#     def test_pop_one(self):
-#         self.rpn.stack = [1, 2, 3, 4]
-#         self.assertEqual(self.rpn.pop_one(), 4)
-#
-#     def test_pop_two(self):
-#         self.rpn.stack = [1, 2, 3, 4]
-#         self.assertEqual(self.rpn.pop_one(), 4, 3)
-#
-#     def test_handle_operations(self):
-#         expression1 = '3 + 2 1'
-#         rpn_expression1 = self.rpn.convert_to_rpn(expression1)
-#         with self.assertRaises(pycalc.RedundantParameterError):
-#             self.rpn.handle_operations(rpn_expression1)
-#
-#
-# class TestCheck(TestCase):
-#     def setUp(self):
-#         self.rpn = pycalc.RPN()
-#         self.check = pycalc.Check()
-#
-#     def test_check_for_numbers(self):
-#         expression1 = 'sin+cos'
-#         expression2 = '3+2'
-#         with self.assertRaises(pycalc.MissingParameterError):
-#             self.check.check_for_numbers(expression1)
-#         self.check.check_for_numbers(expression2)
-#
-#     def test_check_parentheses(self):
-#         expression1 = '8*(3+2))'
-#         expression2 = '(8*(3+2))'
-#         expression3 = '(8*(3+2)'
-#         with self.assertRaises(pycalc.UnbalancedParenthesesError):
-#             self.check.check_parentheses(expression1)
-#         self.check.check_parentheses(expression2)
-#         with self.assertRaises(pycalc.UnbalancedParenthesesError):
-#             self.check.check_parentheses(expression3)
-#
-#     def test_check_for_symbols(self):
-#         expression1 = '8#(3+2))'
-#         expression2 = '8+(3~2))'
-#         expression3 = '3 + 2'
-#         with self.assertRaises(pycalc.UnknownSymbolError):
-#             self.check.check_for_symbols(expression1)
-#         with self.assertRaises(pycalc.UnknownSymbolError):
-#             self.check.check_for_symbols(expression2)
-#         self.check.check_for_symbols(expression3)
-#
-#     def test_check_spaces(self):
-#         expression1 = '1 2'
-#         expression2 = '8 > =  7'
-#         expression3 = '11 + sin(13)'
-#         expression4 = '5 / / 88'
-#         expression5 = '(88) .3'
-#         with self.assertRaises(pycalc.UnexpectedSpaceError):
-#             self.check.check_spaces(expression1)
-#         with self.assertRaises(pycalc.UnexpectedSpaceError):
-#             self.check.check_spaces(expression2)
-#         self.check.check_spaces(expression3)
-#         with self.assertRaises(pycalc.UnexpectedSpaceError):
-#             self.check.check_spaces(expression4)
-#         with self.assertRaises(pycalc.UnexpectedSpaceError):
-#             self.check.check_spaces(expression5)
+    def test_pop_one(self):
+        self.handler.stack = ['1', '2']
+        self.assertEqual(self.handler.pop_one(), 2.0)
+
+    def test_pop_two(self):
+        self.handler.stack = ['1', '2', '3']
+        self.assertEqual(self.handler.pop_two(), (2.0, 3.0))
+
+    @parameterized.expand([
+        (['pi', '2', '1', '^', '/', 'sin', '1', '4', '*', '2', '2', '^', '+', '1', '+', '3', '2', '^', 'log', '+'],
+         math.sin(math.pi / 2 ** 1) + math.log(1 * 4 + 2 ** 2 + 1, 3 ** 2)),
+        (['2.0', 'pi', 'pi', '/', 'e', 'e', '/', '+', '2.0', '0.0', '^', '+', '^'],
+         (2.0 ** (math.pi / math.pi + math.e / math.e + 2.0 ** 0.0)))
+    ])
+    def test_handle_operation(self, tokens, expected):
+        self.assertEqual(self.handler.handle_operations(tokens), expected)
+
+
+class TestCheck(unittest.TestCase):
+    def setUp(self):
+        self.checker = pycalc.ErrorChecker()
+
+    @parameterized.expand([
+        'sin+cos$',
+        'x*3+tg####',
+        '3 ~ 2',
+    ])
+    def test_check_for_symbols(self, expression):
+        with self.assertRaises(pycalc.UnknownSymbolError):
+            self.checker.check_for_symbols(expression)
+
+    @parameterized.expand([
+        '8*(3+2))',
+        '((8*(3+2))',
+        '(8*(3+2)',
+    ])
+    def test_check_parentheses(self, expression):
+        with self.assertRaises(pycalc.UnbalancedParenthesesError):
+            self.checker.check_parentheses(expression)
+
+    @parameterized.expand([
+        '1 2',
+        '8 > =  7',
+        '5 / / 88',
+        '(88) .3',
+    ])
+    def test_check_spaces(self, expression):
+        with self.assertRaises(pycalc.UnexpectedSpaceError):
+            self.checker.check_spaces(expression)
 
 
 if __name__ == '__main__':
